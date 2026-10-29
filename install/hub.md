@@ -5,10 +5,6 @@ description: Install a self-hosted hub for encrypted sync, profiles and shared l
 
 Sampler Hub is a small self-hosted server that keeps your Opera devices in sync. Install it on a computer you own, pair your phone, desktop and browser, and the hub handles the rest:
 
-:::note
-Sampler Hub was previously called Opera Hub. The binary is now `sampler-hub` and the repository is `Sampler-Hub`.
-:::
-
 - **Sync**: conversations, settings and AI providers move between your devices.
 - **Profiles**: one hub for a home or flat share. Each profile is sealed end to end; the hub stores it but cannot read it.
 - **Shared AI**: Ollama, LM Studio and llama.cpp on the hub's computer can be used from every paired device, even outside your home network.
