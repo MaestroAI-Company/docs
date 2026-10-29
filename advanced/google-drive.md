@@ -1,70 +1,115 @@
 ---
 title: Google Drive account
-description: Point a self-built Opera at your own Google Cloud project for Drive sync.
+description: Point a self-built Opera at your own Google Cloud project for Drive sync and backup.
 ---
 
-Opera ships with a default Google Cloud project for Drive sync. If you build Opera yourself, you can use your own Google Cloud project instead. This gives you control over the OAuth consent screen and keeps sync traffic on your own quota.
+Opera backs up (or syncs, without Sampler) to the app's hidden folder on Google Drive (`appDataFolder`). By default the app uses the OAuth clients of the Maestro AI Google Cloud project. This guide shows how to replace them with your own, for example in a fork or a personal build.
 
 :::note
-This only matters if you build Opera from source. The default project works out of the box for installed builds.
+This only matters if you build Opera from source. Installed builds work out of the box.
 :::
 
-## Why change it
+## What the app asks Google for
 
-- You are self-hosting Opera for a group and want sync under your own Google account instead of the default one.
-- You hit Google's OAuth consent limits on the default project.
-- You want the consent screen to show your own app name and logo instead of Opera's.
+- **API**: Google Drive API.
+- **Scopes**: `https://www.googleapis.com/auth/drive.appdata`, `email`, `profile`. `drive.appdata` only reaches the app's hidden folder, never the rest of the Drive.
+- **One OAuth client per platform**:
 
-## Create a Google Cloud project
+| Platform | Google client type | Where it is used |
+|---|---|---|
+| Android | Android | `ANDROID_CLIENT_ID` in `src/services/cloud/GoogleDriveProvider.ts` |
+| iOS | iOS | `IOS_CLIENT_ID` in the same file |
+| Web and desktop | Web application | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, otherwise `WEB_CLIENT_ID` in the same file |
 
-1. Go to [console.cloud.google.com](https://console.cloud.google.com) and create a new project.
-2. In **APIs & Services → Library**, enable the **Google Drive API**.
-3. In **APIs & Services → OAuth consent screen**, choose **External**, fill in the app name and support email, then add the `drive.file` scope. You can leave testing mode for personal use; publish the app if others will use it.
+Android and iOS come back to the app through a URL scheme made of the reversed client ID (`com.googleusercontent.apps.<id>:/oauth2redirect/google`). That scheme must also be declared in `app.json`.
 
-## Create OAuth client IDs
+## 1. Create the project and enable the API
 
-You need one client per platform:
+1. Open the [Google Cloud console](https://console.cloud.google.com/) and create a project.
+2. **APIs & Services → Library**: enable **Google Drive API**.
+
+## 2. Set up the consent screen
+
+1. **APIs & Services → OAuth consent screen** (or **Google Auth Platform → Branding**).
+2. User type: **External**.
+3. Fill in the app name, the contact address, and the domain if you publish the web version.
+4. **Data access (scopes)**: add `.../auth/drive.appdata`, `email` and `profile`.
+5. **Audience**:
+   - **Testing**: only accounts added as test users can sign in (100 at most). Google expires refresh tokens after 7 days in this mode, so users have to sign in again.
+   - **In production**: any Google account can sign in. `drive.appdata` is not a sensitive scope, so Google's verification stays light.
+
+## 3. Create the OAuth clients
+
+In **APIs & Services → Credentials → Create credentials → OAuth client ID**.
 
 ### Android
 
-1. In **APIs & Services → Credentials**, create an **OAuth client ID** of type **Android**.
-2. Enter your signing certificate's SHA-1 fingerprint (`ai.maestro.opera` is the package name).
-3. Copy the generated client ID.
+1. Type: **Android**.
+2. **Package name**: `ai.maestro.opera`. Debug and preview builds (`ai.maestro.opera.dev`) work with this same client.
+3. **SHA-1 fingerprint** of the key that signs your release APK: the SHA-1 of your upload key, or of the Google Play signing key if you use Play App Signing (Play Console → App integrity).
+4. In the client's **advanced settings**, enable the **custom URI scheme**. The app comes back from the Google sign-in through that scheme; without it, Google refuses the redirect.
+5. Copy the client ID (`xxxx.apps.googleusercontent.com`).
 
 ### iOS
 
-Create an **OAuth client ID** of type **iOS** with the bundle identifier `ai.maestro.opera`.
+1. Type: **iOS**.
+2. **Bundle ID**: `ai.maestro.opera`.
+3. Copy the client ID.
 
-### Web
+### Web and desktop
 
-Create an **OAuth client ID** of type **Web application**. Add an authorized redirect URI that matches where you serve Opera, for example `http://localhost:8081/oauth2redirect/google`. For desktop development Opera binds a fixed loopback port, so also add `http://localhost:46357/oauth2redirect/google`.
+1. Type: **Web application**.
+2. **Authorized JavaScript origins**:
+   - `http://localhost:8081` (`npm run web` locally);
+   - the origin of your published web version, for example `https://app.example.com`.
+3. **Authorized redirect URIs**:
+   - `http://localhost:8081/oauth2redirect/google` (local web);
+   - `https://app.example.com/oauth2redirect/google` (published web);
+   - `http://localhost:46357/oauth2redirect/google` (Opera Desktop opens the sign-in in the browser and listens on this fixed port).
+4. Copy the client ID.
 
-## Set the client IDs
+Web and desktop get no refresh token: they ask to sign in again when the token expires, after about an hour.
 
-Opera reads the web client ID and redirect URI from environment variables:
+## 4. Plug the clients into Opera
+
+### Android and iOS
+
+1. In `src/services/cloud/GoogleDriveProvider.ts`, replace `ANDROID_CLIENT_ID` and `IOS_CLIENT_ID` with your client IDs.
+2. In `app.json`, replace the two `com.googleusercontent.apps.390321100520-...` entries of the `scheme` list with your reversed client IDs. For the client ID `1234-abcd.apps.googleusercontent.com`, the scheme is `com.googleusercontent.apps.1234-abcd`.
+3. Regenerate the native project, then rebuild:
+
+   ```bash
+   npx expo prebuild --platform android
+   npm run android
+   ```
+
+### Web and desktop
+
+Create a `.env` file at the root of the project, or secrets in your CI:
 
 ```bash
-export EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-export EXPO_PUBLIC_GOOGLE_REDIRECT_URI="http://localhost:8081/oauth2redirect/google"
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=1234-abcd.apps.googleusercontent.com
+EXPO_PUBLIC_GOOGLE_REDIRECT_URI=https://app.example.com/oauth2redirect/google
 ```
 
-Android and iOS client IDs are compiled in. Edit `src/services/cloud/GoogleDriveProvider.ts` and replace the constants at the top of the file:
+- `EXPO_PUBLIC_GOOGLE_REDIRECT_URI` only matters for the published web version: it is used only when its origin is the page's origin. Locally the app computes `http://localhost:8081/oauth2redirect/google` on its own.
+- The `deploy-web.yml` workflow already passes `EXPO_PUBLIC_GOOGLE_REDIRECT_URI` from the repository secrets. Add `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` the same way if you publish the web version with your own client.
 
-```ts
-const ANDROID_CLIENT_ID = 'your-android-client-id.apps.googleusercontent.com';
-const IOS_CLIENT_ID = 'your-ios-client-id.apps.googleusercontent.com';
-```
+## 5. Check
 
-Then rebuild the app:
+1. In the app, open **Settings → Sync & backup** and pick **Google Drive**.
+2. Sign in with an allowed account (a test user while the consent screen is in testing mode).
+3. The page shows your account. Run a sync or a backup, then check the **Last synced** or **Last backup** row.
 
-```bash
-npm run android
-```
+## Common errors
 
-## Verify
+| Google error | Likely cause |
+|---|---|
+| `redirect_uri_mismatch` | The redirect URI is missing from the Web client's list (port, `/oauth2redirect/google` path, or `http` vs `https`). |
+| `invalid_request`, scheme refused on Android | The custom URI scheme is not enabled on the Android client, or the `app.json` scheme does not match the client ID. |
+| `access_denied`, "app not verified" | The account is not a test user while the consent screen is in testing mode. |
+| Signed out after a week | Consent screen in testing mode: refresh tokens expire after 7 days. Move it to production. |
 
-1. Open **Settings → Backup → Google Drive** and sign in.
-2. Google shows your consent screen with your app name.
-3. After the sign-in completes, the Drive provider appears as connected.
-
-If sign-in fails, check that the redirect URI in your Google Cloud credentials exactly matches what the app generates. On web, the redirect uses the origin you serve the app from, so the URI must match that origin.
+:::caution
+Switching Google projects does not move files: a backup made with the old project stays in that project's hidden folder, which the new one cannot see. Make a new backup from a device that has the data.
+:::

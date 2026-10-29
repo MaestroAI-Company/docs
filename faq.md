@@ -46,7 +46,7 @@ If no paired device remains, the profile cannot be decrypted. There is no accoun
 
 ## Which platforms are supported?
 
-Opera targets Android, desktop and the web. Sampler Hub runs on Windows, macOS (Apple silicon) and Linux (x86_64 and arm64). Check the releases page for the latest builds.
+Opera runs on Android, the web, and as Opera Desktop on Windows (x64 and ARM64), macOS (Apple silicon) and Linux (x86_64 and arm64). Sampler Hub runs on Windows, macOS (Apple silicon) and Linux (x86_64 and arm64). Check the releases page for the latest builds.
 
 ## Which languages does the interface support?
 

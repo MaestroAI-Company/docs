@@ -7,9 +7,19 @@ Opera for Android is the reference build. It can replace your default assistant,
 
 ## Install
 
-### Join the beta
+### From the Play Store
 
-The Android build is distributed as a beta. Use the beta link on [maestroai.company/opera.html](https://maestroai.company/opera.html), or install a release APK from the [GitHub releases](https://github.com/MaestroAI-Company/opera/releases).
+Install Opera from [Google Play](https://play.google.com/store/apps/details?id=ai.maestro.opera). Updates arrive through the store.
+
+To try new versions before everyone else, join the open beta from the same Play Store page (**Join the beta**). You can leave it at any time from there.
+
+### Download the APK
+
+Every release also carries the APK: download `app-release.apk` from the [latest GitHub release](https://github.com/MaestroAI-Company/opera/releases/latest/download/app-release.apk) and open it on your phone. Android asks you to allow installs from your browser or file manager the first time.
+
+:::note
+The APK and the Play Store version are signed with different keys, so Android won't update one with the other. Uninstall the one you have before switching, after exporting your data from **Settings → Confidentiality** if you want to keep it.
+:::
 
 ### Build a dev client
 
