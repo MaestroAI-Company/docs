@@ -1,0 +1,21 @@
+name: Publish docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  notify-website:
+    runs-on: ubuntu-latest
+    steps:
+      #website repo rebuilds and deploys maestroai.company/docs
+      - name: Trigger website deploy
+        env:
+          TOKEN: ${{ secrets.WEBSITE_DISPATCH_TOKEN }}
+        run: |
+          curl -fsS -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $TOKEN" \
+            https://api.github.com/repos/MaestroAI-Company/website/dispatches \
+            -d '{"event_type":"docs-updated"}'
